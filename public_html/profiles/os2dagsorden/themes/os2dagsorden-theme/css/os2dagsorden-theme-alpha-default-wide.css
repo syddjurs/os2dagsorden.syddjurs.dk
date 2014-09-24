@@ -15,3 +15,8 @@ div.date-heading h3 a, div.date-heading h3 {
 }
 
 /*---------------------------- Date override END ----------------------------*/
+
+.container-24 .grid-18 table.views-table tr td a {
+  padding: 3px 10px 3px 10px;
+}
+

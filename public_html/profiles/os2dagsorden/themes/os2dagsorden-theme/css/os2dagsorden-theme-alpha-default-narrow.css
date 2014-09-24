@@ -2,3 +2,8 @@
 /* If you are using the default media queries provided by Omega, these styles will also
  *  apply to the normal and widescreen layouts. You may override these styles in the normal
  *  and widescreen CSS files as appropriate. */
+
+.container-24 .grid-18 table.views-table tr td a {
+  padding: 3px 2px 3px 5px;
+}
+
