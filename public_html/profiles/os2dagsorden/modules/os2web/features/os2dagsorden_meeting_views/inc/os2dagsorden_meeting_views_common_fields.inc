@@ -40,8 +40,9 @@ function os2dagsorden_meeting_views_common_meeting_title_listed($data){
 
   //logic for touch devices
   if (os2dagsorden_access_helper_is_touch()){
-    if (mb_strlen($title) > 25)
-      echo mb_substr($title, 0, 22) . '...';
+    if (mb_strlen($title) > 15) {
+      echo mb_substr($title, 0, 15) . '...';
+    }
     else
       echo $title;
   } else {//desktop device
