@@ -36,7 +36,7 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 
       if (empty($node)){//if fails, trying to get meeting from date and committe combination. Assuming this is unique
 	  $committee = _os2web_esdh_provider_find_create_committee($meeting['committee_id'], $meeting['committee_name'], $meeting['committee_group_id']);
-	  
+
 	  //getting meeting
 	  $meeting_start_date_0000 = date('Y-m-d 00:00:00', strtotime($meeting['meeting_date_start']));
 	  $meeting_start_date_2359 = date('Y-m-d 23:59:59', strtotime($meeting['meeting_date_start']));
@@ -59,8 +59,8 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 	      $node->type = "meeting";
 	      $node->language = LANGUAGE_NONE;
 	      node_object_prepare($node);
-	      
-	      if ($committee) 
+
+	      if ($committee)
 		$node->field_committee[LANGUAGE_NONE][0]['tid'] = $committee->tid;
 	      else
 		return;
@@ -73,26 +73,26 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 	  if (strcmp($field['value'], $meeting['acadre_version']) == 0){//meeting already has this acadre version, therefore aborting by continue
 	    $contains_acadre_version = TRUE;
 	    break;
-	  } 
+	  }
 	}
 	if ($contains_acadre_version){
 	  continue;
 	}
       }
-      
+
       $node->title = $meeting['title'];
       if (strlen($node->title) > 250)
 	$node->title = substr($node->title, 0, 250);
-      
+
       $node->field_meeting_acadre_version[LANGUAGE_NONE][]['value'] = $meeting['acadre_version'];//adding the acarde version of the meeting
       if (!empty($meeting['meeting_id']))
 	$node->field_meeting_sysid[LANGUAGE_NONE][0]['value'] = $meeting['meeting_id'];
-      else 
+      else
 	$node->field_meeting_sysid[LANGUAGE_NONE][0]['value'] = '0';
-	
+
       $node->field_date[LANGUAGE_NONE][0]['value'] = $meeting['meeting_date_start'];
       $node->field_date[LANGUAGE_NONE][0]['value2'] = $meeting['meeting_date_finish'];
-      
+
       // Proper id tagging.
       if ($meeting_id['id'])
 	$node->field_meeting_acadre_id[LANGUAGE_NONE][0]['value'] = $meeting_id['id'];
@@ -101,35 +101,46 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
       if ($location) {
 	$node->field_location[LANGUAGE_NONE][0]['tid'] = $location->tid;
       }
-      
+
       //Adding default meeting category
       $node->field_meeting_category[LANGUAGE_NONE][0]['value']=variable_get('os2dagsorden_default_meeting_cateroty','pol');
-      
+
       //Adding participants
       if ($meeting['participants']){
 	$node->field_meeting_participants[LANGUAGE_NONE][0]['value'] = implode(variable_get('participants_delimeter', ', '), $meeting['participants']);
       }
-      
+
      //Adding comments
       if (isset($meeting['description'])){
        $node->field_meeting_comments[LANGUAGE_NONE][0]['value'] = $meeting['description'];
       }
-      
-     
+
+
       if (isset($meeting['special_conditions'])){
            $node->field_meeting_conditions[LANGUAGE_NONE][0]['value'] = $meeting['special_conditions'];
       }
- 
+
       //Adding participants cancellations
       if ($meeting['participants_cancellation']){
 	$node->field_participants_cancellation[LANGUAGE_NONE][0]['value'] = implode(variable_get('participants_delimeter', ', '), $meeting['participants_cancellation']);
       }
-      
+
       // Import items.
       if (is_array($meeting['items'])) {
 	$item_nids = _os2web_esdh_provider_import_items($meeting['items']);
+	// Yani: Check if field_ref_bullet_points contains the nid, if not, add to target_id.
+	$exists_nids = array();
+	if ($exists_nids = field_get_items('node', $node, 'field_ref_bullet_points')) {
+	  foreach ($exists_nids as $key => $value) {
+	    $exists_nids[$key] = $value['target_id'];
+	  }
+	}
+
+
 	foreach ($item_nids as $nid) {
-	  $node->field_ref_bullet_points[LANGUAGE_NONE][]['target_id'] = $nid;
+	  if (!in_array($nid, $exists_nids, true)) {
+	    $node->field_ref_bullet_points[LANGUAGE_NONE][]['target_id'] = $nid;
+	  }
 	}
       }
 
@@ -139,17 +150,17 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 	  $description = _os2web_esdh_provider_import_file($meeting['full_doc']);
 	  $description->description = $meeting_id['id'];
 	  $description = file_save($description);
-      
+
 	  if (strcmp($meeting['agenda_access'], 'Lukket') == 0){
 	    if (!stripos($meeting['agenda_type'], 'tillæg') && stripos($meeting['agenda_type'], 'tillæg') !== 0){//not additional agenda
 	      $file_field = $node->field_meeting_description_closed;
 	      if (os2web_esdh_provider_should_import_description($file_field, $meeting['acadre_version'])){
 		$node->field_meeting_description_closed[$node->language][0] = (array) $description;
-	      }	  
+	      }
 	    } else {//is additional agenda
 	      $imported = FALSE;
 	      if (isset($node->field_meeting_description_add_c)){
-		foreach($node->field_meeting_description_add_c as $index => $description_field){    
+		foreach($node->field_meeting_description_add_c as $index => $description_field){
 		  if ($description_field['description'] === $meeting_id['id']){//same acadre id, replace the description
 		      $node->field_meeting_description_add_c[$node->language][$index] = (array) $description;
 		      $imported = TRUE;
@@ -169,7 +180,7 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 	    } else {//is additional agenda
 	      $imported = FALSE;
 	      if (isset($node->field_meeting_description_add)){
-		foreach($node->field_meeting_description_add as $index => $description_field){    
+		foreach($node->field_meeting_description_add as $index => $description_field){
 		  if ($description_field['description'] === $meeting_id['id']){//same acadre id, replace the description
 		      $node->field_meeting_description_add[$node->language][$index] = (array) $description;
 		      $imported = TRUE;
@@ -183,23 +194,23 @@ function _os2web_esdh_provider_import_meeting($meeting_id, $force = FALSE, &$con
 	  }
 	}
       }
-      
-      
+
+
       //change status to Dagsorden / Referat and force the email notification
       $node = os2dagsorden_access_helper_set_meeting_status_and_save($node, $meeting['type']);
-      
+
       //check if a meeting is in a fully converted state, then change status to Dagsorden+/Referat+ status
       if (os2dagsorden_access_helper_meeting_fully_converted($node)){
 	$node = os2dagsorden_access_helper_set_meeting_status_and_save($node, $meeting['type'] . '+');
       }
-	
+
       watchdog('ESDH', 'Imported agenda id: %aid (Meeting: %mid) into node %nid .', array(
 	'%aid' => $meeting['system_id'],
 	'%mid' => $meeting['meeting_id'],
 	'%nid' => $node->nid), WATCHDOG_DEBUG);
-      
+
       $nids[] = $node->nid;
-      
+
       //schedule description for PDF convertion
       if (module_exists('os2dagsorden_adlib_api')) {
 	os2dagsorden_adlib_api_convert_to_pdf($description->fid, $node->nid);
@@ -225,7 +236,7 @@ function os2web_esdh_provider_should_import_description($file_field, $acadre_ver
     $ext = explode('.', $file['filename']);
     if (intval($ext[0]) < intval($acadre_version))
       return TRUE;
-    else 
+    else
       return FALSE;
   } else {
     return TRUE;
@@ -249,7 +260,7 @@ function _os2web_esdh_provider_import_items($items) {
     $query->entityCondition('entity_type', 'node')
         ->fieldCondition('field_bullet_point_id', 'value', $item['sysid'], '=');
     $result = $query->execute();
-    
+
     if (isset($result['node'])) {
         $all_nids = array_keys($result['node']);
         $node = reset(entity_load('node', $all_nids));
@@ -260,39 +271,39 @@ function _os2web_esdh_provider_import_items($items) {
         $node->type = "bullet_point";
         $node->language = LANGUAGE_NONE;
         $bullet_point_exists = FALSE;
-        
+
         node_object_prepare($node);
 
         $node->field_bullet_point_id[$node->language][0]['value'] = $item['sysid'];
-    } 
-    
+    }
+
     //check the name
     if (!stripos($item['agenda_type'], 'tillæg') && stripos($item['agenda_type'], 'tillæg') !== 0)
       $node->title = $item['title'];
     else
       $node->title = 'Tillægsdagsorden: ' . $item['title'];
-    
+
     if (strlen($node->title) > 250)
       $node->title = substr($node->title, 0, 250);
-      
+
     if ($item['caseno']){
       $node->title .= ' (' . $item['caseno'] . ')';
     }
 
     $node->field_bul_point_number['und'][0]['value'] = $item['id'];
- 
+
     if ($item['access'] === 'Lukket') {
       $node->field_bul_point_closed[LANGUAGE_NONE][0]['value'] = 1;
     } else {
       $node->field_bul_point_closed[LANGUAGE_NONE][0]['value'] = 0;
     }
-    
+
     if ($item['access'] === 'Person') {
       $node->field_bul_point_personal[LANGUAGE_NONE][0]['value'] = 1;
     } else {
       $node->field_bul_point_personal[LANGUAGE_NONE][0]['value'] = 0;
     }
-    
+
     // Gather the bullets for the item.
     if (isset($item['bullets']) && is_array($item['bullets'])) {
       $bullet_nids = _os2web_esdh_provider_import_bullets($item['bullets']);
@@ -307,7 +318,7 @@ function _os2web_esdh_provider_import_items($items) {
     foreach ($item['enclosures'] as $enclosure) {
       if ($file = _os2web_esdh_provider_import_file($enclosure)) {
 	$enclosure_nid = _os2web_esdh_provider_add_enclosure_bullet($enclosure, $file);
-	
+
 	$contains = FALSE;
 	if (isset($enclosure_nid)){//if the ID is empty - means that the enclosure has been created before, and hence already added to the bullet point
 	  if (isset($node->field_ref_attachment[LANGUAGE_NONE])) {
@@ -320,7 +331,7 @@ function _os2web_esdh_provider_import_items($items) {
 	  }
 	  if (!$contains)
             $node->field_ref_attachment[LANGUAGE_NONE][]['target_id'] = $enclosure_nid;
-            
+
 	  $filetype = $enclosure['filetype'];
 
 	  //Adlib Conversion
@@ -340,11 +351,12 @@ function _os2web_esdh_provider_import_items($items) {
 	watchdog('ESDH', 'There was an error importing file %uri ', array('%uri' => $enclosure['uri']), WATCHDOG_ERROR);
       }
     }
-    
+
     node_submit($node);
     node_save($node);
-    if (!$bullet_point_exists)//only add it if it is not existing in the system, avoiding readding the same node to the meeting
-      $nids[] = $node->nid;
+
+    // Yani: return all the nids, but check the field value. See function _os2web_esdh_provider_import_meeting().
+    $nids[] = $node->nid;
   }
   return $nids;
 }
@@ -385,19 +397,19 @@ function _os2web_esdh_provider_import_bullets($bullets) {
     $node->title = $bullet['title'];
     if (strlen($node->title) > 250)
       $node->title = substr($node->title, 0, 250);
-      
+
     // Let's add standard body field
     $content_ind_start = strpos($bullet['body'], '<div class=Section1>');
 
     $bullet['body'] = substr($bullet['body'], $content_ind_start);
 
     $node->field_bpa_body[$node->language][0]['value'] = $bullet['body'];
-    $node->field_bpa_body[$node->language][0]['format'] = 'filtered_html'; // If field has a format, you need to define it. Here we define a default filtered_html format for a body field  
-      
+    $node->field_bpa_body[$node->language][0]['format'] = 'filtered_html'; // If field has a format, you need to define it. Here we define a default filtered_html format for a body field
+
     node_submit($node);
     node_save($node);
 
-    $nids[] = $node->nid;    
+    $nids[] = $node->nid;
   }
   return $nids;
 }
@@ -435,7 +447,7 @@ function _os2web_esdh_provider_import_file($file_meta) {
       $file->status = FILE_STATUS_PERMANENT;
       $file = file_save($file);
   }
-  
+
   return $file;
 }
 
@@ -447,9 +459,9 @@ function _os2web_esdh_provider_import_file($file_meta) {
  *
  * @param SimpleXMLElement $enclosure xml
  * @param stdClass         $file      file
- * 
+ *
  * @author Stanislav Kutasevits
- * 
+ *
  * @return int - Node ID
  */
 function _os2web_esdh_provider_add_enclosure_bullet($enclosure, $file) {
@@ -475,7 +487,7 @@ function _os2web_esdh_provider_add_enclosure_bullet($enclosure, $file) {
     $node->title = 'Bilag: ' . $enclosure['title'];
     if (strlen($node->title) > 250)
       $node->title = substr($node->title, 0, 250);
-       
+
     $node->field_bpa_file[$node->language][] = (array) $file;
     if ($enclosure['access'] === 'False')
       $node->field_bpa_closed[$node->language][0]['value'] = 1;
@@ -504,22 +516,22 @@ function _os2web_esdh_provider_find_create_committee($committee_acadre_id, $comm
         ->condition('machine_name', 'committee')
         ->execute()
         ->fetchField();
-    
+
     $query = new EntityFieldQuery();
     if ($committee_acadre_id){
       $query->entityCondition('entity_type', 'taxonomy_term')
 	  ->propertyCondition('vid', $vid)
 	  ->fieldCondition('field_committee_acadre_id', 'value', $committee_acadre_id, '=');
-	  
+
       $result = $query->execute();
     } else if ($committee_name){
       $query->entityCondition('entity_type', 'taxonomy_term')
 	  ->propertyCondition('vid', $vid)
 	  ->propertyCondition('name', $committee_name);
-	  
+
       $result = $query->execute();
     }
-    
+
     if (isset($result['taxonomy_term'])) {
         $tids = array_keys($result['taxonomy_term']);
         $term = taxonomy_term_load($tids[0]);
@@ -535,7 +547,7 @@ function _os2web_esdh_provider_find_create_committee($committee_acadre_id, $comm
 	if ($committee_group_id)
 	  $term->field_id['und'][0]['value'] = $committee_group_id;
 	taxonomy_term_save($term);
-	
+
 	return $term;
     }
     return NULL;
@@ -545,7 +557,7 @@ function _os2web_esdh_provider_find_create_committee($committee_acadre_id, $comm
  * Find the existing or creates a new location taxonomy tern
  *
  * @param $location_name name of the location
- * 
+ *
  * @return location term
  */
 function _os2web_esdh_provider_find_create_location($location_name) {
@@ -554,7 +566,7 @@ function _os2web_esdh_provider_find_create_location($location_name) {
         ->condition('machine_name', 'lokation')
         ->execute()
         ->fetchField();
-        
+
     $terms = taxonomy_get_term_by_name($location_name, $vid);
     if ($terms){
 	$term = array_pop($terms);
@@ -565,7 +577,7 @@ function _os2web_esdh_provider_find_create_location($location_name) {
 	$term->name = $location_name;
 	taxonomy_term_save($term);
     }
-    
+
     return $term;
 }
 
@@ -671,7 +683,7 @@ function _os2web_esdh_provider_similar_file_exists($filename) {
     if (file_exists($filename)) {
       return $filename;
     }
-    
+
     $dir = dirname($filename);
     $files = glob($dir . '/*');
     $lcaseFilename = strtolower($filename);
